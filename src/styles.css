@@ -1,0 +1,125 @@
+.vkms-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  margin: 0 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vkui--color_icon_secondary, var(--icon_secondary, #818c99));
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.vkms-download-btn:hover {
+  color: var(--vkui--color_icon_accent, var(--accent, #2688eb));
+  background-color: var(--vkui--color_background_secondary_alpha, rgba(129, 140, 153, 0.12));
+}
+
+.vkms-download-btn:active {
+  transform: scale(0.94);
+}
+
+.vkms-download-btn.vkms-in-player {
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+}
+
+.vkms-download-btn.vkms-in-row {
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+}
+
+.vkms-download-btn .vkms-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.vkms-download-btn.vkms-state-loading {
+  color: var(--vkui--color_icon_accent, #2688eb);
+  cursor: progress;
+}
+
+.vkms-download-btn.vkms-state-done {
+  color: #4bb34b;
+}
+
+.vkms-download-btn.vkms-state-error {
+  color: #e64646;
+}
+
+.vkms-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.vkms-spinner {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(38, 136, 235, 0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: vkms-spin 0.75s linear infinite;
+}
+
+.vkms-pct {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes vkms-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vkms-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 999999;
+  max-width: 380px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #2c2d2e;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.vkms-toast.vkms-toast-error {
+  background: #c93b3b;
+}
+
+.vkms-toast.vkms-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
