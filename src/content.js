@@ -2,9 +2,20 @@
   'use strict';
 
   const extApi = globalThis.browser ?? globalThis.chrome;
+  const settingsApi = globalThis.VKMS?.settings;
   const CHANNEL = 'VKMS_BRIDGE';
   const BROADCAST_RE = /транслировать\s+аудиозапис|broadcast\s+audio/i;
   const SNIPPET_RE = /открыть\s+сниппет|open\s+snippet/i;
+
+  let currentSettings = settingsApi
+    ? { ...settingsApi.DEFAULT_SETTINGS }
+    : {
+        showInPlayer: true,
+        showInTrackRows: true,
+        hideBroadcast: false,
+        hideSnippet: false,
+        showNotifications: true,
+      };
 
   let seqCounter = 0;
   let scanTimer = null;
@@ -12,20 +23,20 @@
   const activeButtonsByDownloadId = new Map();
 
   const DOWNLOAD_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-dl" viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+    <svg class="vkms-icon vkms-icon-dl" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
       <path d="M12 4v10m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M5 17v1.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   `;
 
   const CHECK_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-ok" viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+    <svg class="vkms-icon vkms-icon-ok" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
       <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   `;
 
   const ERROR_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-err" viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+    <svg class="vkms-icon vkms-icon-err" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
       <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     </svg>
@@ -166,7 +177,9 @@
     } catch (err) {
       const msg = err?.message || 'Ошибка скачивания';
       console.error('[VK Music Saver]', err);
-      showToast(`VK Music Saver: ${msg}`, true);
+      if (currentSettings.showNotifications) {
+        showToast(`VK Music Saver: ${msg}`, true);
+      }
       setButtonState(btn, 'error', msg);
       setTimeout(() => {
         if (btn.isConnected && btn.dataset.vkmsState === 'error') {
@@ -288,26 +301,77 @@
     return node;
   }
 
-  function hideElement(node) {
-    node.style.setProperty('display', 'none', 'important');
-    node.setAttribute('data-vkms-hidden', '1');
+  function setNodeVisibility(node, visible) {
+    if (visible) {
+      node.style.removeProperty('display');
+      node.removeAttribute('data-vkms-hidden');
+    } else {
+      node.style.setProperty('display', 'none', 'important');
+      node.setAttribute('data-vkms-hidden', '1');
+    }
   }
 
-  function replaceTargetButton(target) {
+  function applyRoleVisibility(node, role) {
+    const shouldHide =
+      (role === 'broadcast' && currentSettings.hideBroadcast) ||
+      (role === 'snippet' && currentSettings.hideSnippet);
+    setNodeVisibility(node, !shouldHide);
+  }
+
+  function applyDownloadButtonVisibility(btn) {
+    const ctx = btn.dataset.vkmsContext;
+    const visible = ctx === 'row' ? currentSettings.showInTrackRows : currentSettings.showInPlayer;
+    setNodeVisibility(btn, visible);
+  }
+
+  function applyAllSettingsToDom() {
+    for (const node of document.querySelectorAll('[data-vkms-hide-role]')) {
+      applyRoleVisibility(node, node.dataset.vkmsHideRole);
+    }
+    for (const btn of document.querySelectorAll('.vkms-download-btn')) {
+      applyDownloadButtonVisibility(btn);
+    }
+  }
+
+  function processTargetButton(target, role) {
     target.dataset.vkmsProcessed = '1';
     const scope = findControlsScope(target);
     const hideNode = getHideTarget(target, scope);
+    hideNode.dataset.vkmsHideRole = role;
+    applyRoleVisibility(hideNode, role);
 
-    if (scope && scope.querySelector(':scope .vkms-download-btn')) {
-      // Another button in the same control bar (e.g. broadcast + snippet pair)
-      // was already replaced with the download button — hide this second one.
-      hideElement(hideNode);
-      return;
+    const isRow = Boolean(
+      target.closest(
+        '.audio_row, [data-testid="MusicTrackRow"], [data-audio], [data-full-id], [data-audio-id]'
+      )
+    );
+
+    if (scope && !scope.querySelector(':scope .vkms-download-btn')) {
+      const dlBtn = createDownloadButton(target);
+      dlBtn.dataset.vkmsContext = isRow ? 'row' : 'player';
+      if (isRow) {
+        dlBtn.classList.add('vkms-in-row');
+      } else {
+        dlBtn.classList.add('vkms-in-player');
+      }
+      applyDownloadButtonVisibility(dlBtn);
+      hideNode.insertAdjacentElement('afterend', dlBtn);
     }
+  }
 
-    const dlBtn = createDownloadButton(target);
-    hideElement(hideNode);
-    hideNode.insertAdjacentElement('afterend', dlBtn);
+  function ensureTrackRowButtons() {
+    if (!currentSettings.showInTrackRows) return;
+    const actionBars = document.querySelectorAll('.audio_row__actions');
+    for (const bar of actionBars) {
+      if (bar.querySelector(':scope .vkms-download-btn')) continue;
+      const dlBtn = document.createElement('button');
+      dlBtn.type = 'button';
+      dlBtn.className = 'vkms-download-btn vkms-in-row';
+      dlBtn.dataset.vkmsContext = 'row';
+      setButtonState(dlBtn, 'idle');
+      dlBtn.addEventListener('click', handleDownloadClick);
+      bar.appendChild(dlBtn);
+    }
   }
 
   function scanDom() {
@@ -318,10 +382,11 @@
     for (const el of candidates) {
       const role = classifyTargetButton(el);
       if (role) {
-        replaceTargetButton(el);
+        processTargetButton(el, role);
       }
     }
 
+    ensureTrackRowButtons();
     window.postMessage({ channel: CHANNEL, type: 'VKMS_SCAN_ROLES' }, '*');
   }
 
@@ -365,7 +430,7 @@
       if (m.type === 'attributes' && m.attributeName === 'data-vkms-role') {
         const role = classifyTargetButton(m.target);
         if (role) {
-          replaceTargetButton(m.target);
+          processTargetButton(m.target, role);
         }
         continue;
       }
@@ -393,9 +458,30 @@
     attributeFilter: ['aria-label', 'title', 'data-tooltip', 'data-vkms-role', 'class'],
   });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scanDom, { once: true });
-  } else {
+  if (extApi.storage?.onChanged) {
+    extApi.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'local' || !settingsApi) return;
+      const updated = { ...currentSettings };
+      for (const [key, change] of Object.entries(changes)) {
+        updated[key] = change.newValue;
+      }
+      currentSettings = settingsApi.normalizeSettings(updated);
+      applyAllSettingsToDom();
+      scheduleScan();
+    });
+  }
+
+  async function bootstrap() {
+    if (settingsApi) {
+      currentSettings = await settingsApi.loadSettings();
+    }
     scanDom();
+    applyAllSettingsToDom();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+  } else {
+    bootstrap();
   }
 })();

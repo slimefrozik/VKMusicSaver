@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VK Music Saver — Настройки</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-root">
+    <header class="popup-header">
+      <img src="../icons/icon.svg" alt="" class="popup-logo">
+      <div>
+        <h1 class="popup-title">VK Music Saver</h1>
+        <p class="popup-subtitle">Настройки скачивания и интерфейса</p>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">Аудио и файлы</h2>
+
+      <label class="field">
+        <span class="field-label">Качество потока (HLS)</span>
+        <select id="quality" class="select-input">
+          <option value="best">Максимальное (лучший битрейт)</option>
+          <option value="medium">Среднее (сбалансированное)</option>
+          <option value="low">Экономное (минимальный размер)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Предпочитаемый формат</span>
+        <select id="format" class="select-input">
+          <option value="auto">Авто (MP3 / M4A без потерь)</option>
+          <option value="mp3">MP3 (приоритет MP3)</option>
+          <option value="m4a">M4A (контейнер для AAC)</option>
+          <option value="aac">AAC (сырой ADTS без упаковки)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Имя скачанного файла</span>
+        <select id="filenamePattern" class="select-input">
+          <option value="artist_title">Исполнитель - Название</option>
+          <option value="title_artist">Название - Исполнитель</option>
+          <option value="title">Только Название</option>
+        </select>
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Встраивать метаданные</span>
+          <span class="toggle-desc">Записывать исполнителя и название в ID3v2 / M4A</span>
+        </span>
+        <input type="checkbox" id="embedMetadata" class="toggle-input">
+      </label>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Интерфейс VK</h2>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Кнопка в плеере</span>
+          <span class="toggle-desc">Показывать скачивание в панели плеера</span>
+        </span>
+        <input type="checkbox" id="showInPlayer" class="toggle-input">
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Кнопка в списке треков</span>
+          <span class="toggle-desc">Показывать скачивание на строках треков</span>
+        </span>
+        <input type="checkbox" id="showInTrackRows" class="toggle-input">
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Скрыть «Транслировать аудиозаписи:»</span>
+          <span class="toggle-desc">Убирает кнопку трансляции статуса в плеере</span>
+        </span>
+        <input type="checkbox" id="hideBroadcast" class="toggle-input">
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Скрыть «Открыть сниппет»</span>
+          <span class="toggle-desc">Убирает кнопки открытия сниппетов</span>
+        </span>
+        <input type="checkbox" id="hideSnippet" class="toggle-input">
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-text">
+          <span class="toggle-title">Уведомления об ошибках</span>
+          <span class="toggle-desc">Показывать всплывающую подсказку при сбое</span>
+        </span>
+        <input type="checkbox" id="showNotifications" class="toggle-input">
+      </label>
+    </section>
+
+    <footer class="popup-footer">
+      <span id="saveStatus" class="save-status" aria-live="polite"></span>
+      <button type="button" id="resetBtn" class="reset-btn">Сбросить</button>
+    </footer>
+  </div>
+
+  <script src="settings.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

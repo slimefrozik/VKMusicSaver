@@ -146,7 +146,7 @@
    * Remuxes raw ADTS AAC bytes into a fast-start ISO-BMFF (.m4a) container without re-encoding.
    * Returns null if no valid ADTS frames are found.
    */
-  function muxAdtsToM4a(adtsBytes, { title = '', artist = '' } = {}) {
+  function muxAdtsToM4a(adtsBytes, { title = '', artist = '', embedMetadata = true } = {}) {
     const parsed = parseAdtsFrames(adtsBytes);
     if (parsed.frames.length === 0) {
       return null;
@@ -294,7 +294,7 @@
     const mdia = box('mdia', mdhd, hdlr, minf);
     const trak = box('trak', tkhd, mdia);
 
-    const udta = buildUdtaBox(title, artist);
+    const udta = embedMetadata ? buildUdtaBox(title, artist) : null;
     const moovChildren = udta ? [mvhd, trak, udta] : [mvhd, trak];
     const moov = box('moov', ...moovChildren);
 

@@ -16,6 +16,10 @@ const INCLUDE_FILES = [
   'src/m4a-muxer.js',
   'src/mp3-tagger.js',
   'src/page-hook.js',
+  'src/popup.css',
+  'src/popup.html',
+  'src/popup.js',
+  'src/settings.js',
   'src/styles.css',
   'src/ts-demuxer.js',
 ];

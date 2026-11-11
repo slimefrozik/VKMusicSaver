@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "VK Music Saver",
-  "version": "1.0.1",
-  "description": "Заменяет кнопки «Транслировать аудиозаписи:» и «Открыть сниппет» в VK на кнопку скачивания трека в лучшем качестве (MP3 / M4A).",
+  "version": "1.1.0",
+  "description": "Добавляет кнопку скачивания треков в VK рядом с элементами плеера и треков. Поддерживает выбор качества, формата и скрытие лишних кнопок.",
   "browser_specific_settings": {
     "gecko": {
       "id": "vk-music-saver@vkms.addon",
@@ -21,10 +21,24 @@
   "permissions": [
     "downloads",
     "webRequest",
+    "storage",
     "https://*/*"
   ],
+  "browser_action": {
+    "default_icon": {
+      "48": "icons/icon.svg",
+      "96": "icons/icon.svg"
+    },
+    "default_title": "VK Music Saver — Настройки",
+    "default_popup": "src/popup.html"
+  },
+  "options_ui": {
+    "page": "src/popup.html",
+    "open_in_tab": false
+  },
   "background": {
     "scripts": [
+      "src/settings.js",
       "src/mp3-tagger.js",
       "src/ts-demuxer.js",
       "src/m4a-muxer.js",
@@ -50,6 +64,7 @@
         "https://*.vk.ru/*"
       ],
       "js": [
+        "src/settings.js",
         "src/content.js"
       ],
       "css": [

@@ -35,10 +35,11 @@
   }
 
   /**
-   * Parses an HLS master playlist and returns the variant URL with the highest BANDWIDTH.
+   * Parses an HLS master playlist and selects a variant URL matching requested quality:
+   * 'best' (highest bandwidth), 'medium' (middle variant), or 'low' (lowest bandwidth).
    * Returns null if the playlist is a media playlist rather than a master playlist.
    */
-  function pickBestVariantFromMaster(manifestText, baseUrl) {
+  function pickVariantFromMaster(manifestText, baseUrl, quality = 'best') {
     const lines = manifestText.split(/\r?\n/);
     const variants = [];
 
@@ -64,7 +65,18 @@
 
     if (variants.length === 0) return null;
     variants.sort((a, b) => b.bandwidth - a.bandwidth);
+
+    if (quality === 'low') {
+      return variants[variants.length - 1];
+    }
+    if (quality === 'medium' && variants.length > 1) {
+      return variants[Math.floor(variants.length / 2)];
+    }
     return variants[0];
+  }
+
+  function pickBestVariantFromMaster(manifestText, baseUrl) {
+    return pickVariantFromMaster(manifestText, baseUrl, 'best');
   }
 
   function hexToBytes(hexStr) {
@@ -204,16 +216,27 @@
    * Downloads an HLS audio stream (master or media playlist), picks highest bitrate,
    * decrypts AES-128 segments, demuxes MPEG-TS, and returns clean MP3 or M4A bytes.
    */
-  async function downloadHlsAudio(m3u8Url, { title = '', artist = '', onProgress, fetchImpl } = {}) {
+  async function downloadHlsAudio(
+    m3u8Url,
+    {
+      title = '',
+      artist = '',
+      quality = 'best',
+      format = 'auto',
+      embedMetadata = true,
+      onProgress,
+      fetchImpl,
+    } = {}
+  ) {
     const { tsDemuxer, mp3Tagger, m4aMuxer, subtle } = getDeps();
     const fetchFn = fetchImpl || globalThis.fetch.bind(globalThis);
 
     let playlistUrl = m3u8Url;
     let manifestText = await fetchTextWithRetry(fetchFn, playlistUrl);
 
-    const bestVariant = pickBestVariantFromMaster(manifestText, playlistUrl);
-    if (bestVariant) {
-      playlistUrl = bestVariant.url;
+    const chosenVariant = pickVariantFromMaster(manifestText, playlistUrl, quality);
+    if (chosenVariant) {
+      playlistUrl = chosenVariant.url;
       manifestText = await fetchTextWithRetry(fetchFn, playlistUrl);
     }
 
@@ -283,14 +306,19 @@
       const { data, codec } = demuxer.finish();
 
       if (codec === 'aac') {
-        const m4aBytes = m4aMuxer.muxAdtsToM4a(data, { title, artist });
+        if (format === 'aac') {
+          return { data, ext: 'aac', mimeType: 'audio/aac' };
+        }
+        const m4aBytes = m4aMuxer.muxAdtsToM4a(data, { title, artist, embedMetadata });
         if (m4aBytes) {
           return { data: m4aBytes, ext: 'm4a', mimeType: 'audio/mp4' };
         }
         return { data, ext: 'aac', mimeType: 'audio/aac' };
       }
 
-      const taggedMp3 = mp3Tagger.prependId3v2Tag(data, { title, artist });
+      const taggedMp3 = embedMetadata
+        ? mp3Tagger.prependId3v2Tag(data, { title, artist })
+        : data;
       return { data: taggedMp3, ext: 'mp3', mimeType: 'audio/mpeg' };
     }
 
@@ -298,18 +326,24 @@
     const rawCombined = concatUint8Arrays(results);
     const detected = tsDemuxer.detectElementaryAudioCodec(rawCombined);
     if (detected === 'aac') {
-      const m4aBytes = m4aMuxer.muxAdtsToM4a(rawCombined, { title, artist });
+      if (format === 'aac') {
+        return { data: rawCombined, ext: 'aac', mimeType: 'audio/aac' };
+      }
+      const m4aBytes = m4aMuxer.muxAdtsToM4a(rawCombined, { title, artist, embedMetadata });
       if (m4aBytes) {
         return { data: m4aBytes, ext: 'm4a', mimeType: 'audio/mp4' };
       }
       return { data: rawCombined, ext: 'aac', mimeType: 'audio/aac' };
     }
 
-    const taggedMp3 = mp3Tagger.prependId3v2Tag(rawCombined, { title, artist });
+    const taggedMp3 = embedMetadata
+      ? mp3Tagger.prependId3v2Tag(rawCombined, { title, artist })
+      : rawCombined;
     return { data: taggedMp3, ext: 'mp3', mimeType: 'audio/mpeg' };
   }
 
   const api = {
+    pickVariantFromMaster,
     pickBestVariantFromMaster,
     parseMediaPlaylist,
     sequenceToIv,

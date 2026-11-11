@@ -4,8 +4,8 @@
   justify-content: center;
   position: relative;
   box-sizing: border-box;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 4px;
   margin: 0 2px;
   border: none;
@@ -27,23 +27,24 @@
   transform: scale(0.94);
 }
 
-.vkms-download-btn.vkms-in-player {
-  width: 24px;
-  height: 24px;
-  padding: 2px;
-}
-
+.vkms-download-btn.vkms-in-player,
 .vkms-download-btn.vkms-in-row {
-  width: 24px;
-  height: 24px;
-  padding: 2px;
+  width: 28px;
+  height: 28px;
+  padding: 3px;
 }
 
 .vkms-download-btn .vkms-icon {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   pointer-events: none;
+}
+
+.vkms-download-btn.vkms-in-player .vkms-icon,
+.vkms-download-btn.vkms-in-row .vkms-icon {
+  width: 21px;
+  height: 21px;
 }
 
 .vkms-download-btn.vkms-state-loading {
@@ -64,14 +65,14 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  width: 18px;
-  height: 18px;
+  width: 21px;
+  height: 21px;
 }
 
 .vkms-spinner {
   box-sizing: border-box;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(38, 136, 235, 0.25);
   border-top-color: currentColor;
   border-radius: 50%;

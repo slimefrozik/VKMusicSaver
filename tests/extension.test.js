@@ -10,11 +10,13 @@ const { prependId3v2Tag, hasId3v2Header } = require('../src/mp3-tagger.js');
 const { TsAudioDemuxer, isTransportStream } = require('../src/ts-demuxer.js');
 const { parseAdtsFrames, muxAdtsToM4a } = require('../src/m4a-muxer.js');
 const {
+  pickVariantFromMaster,
   pickBestVariantFromMaster,
   parseMediaPlaylist,
   downloadHlsAudio,
 } = require('../src/hls-downloader.js');
 const { sanitizeFilename, buildFilename } = require('../src/background.js');
+const { DEFAULT_SETTINGS, normalizeSettings } = require('../src/settings.js');
 
 function buildTsPacket({ pid, pusi = false, afc = 1, cc = 0, payload = new Uint8Array(0) }) {
   const pkt = new Uint8Array(188);
@@ -142,11 +144,15 @@ test('manifest.json is valid Firefox MV2 manifest with required permissions', ()
   assert.deepEqual(manifest.browser_specific_settings?.gecko?.data_collection_permissions?.required, ['none']);
   assert.ok(manifest.permissions.includes('downloads'));
   assert.ok(manifest.permissions.includes('webRequest'));
+  assert.ok(manifest.permissions.includes('storage'));
   assert.ok(manifest.permissions.includes('https://*/*'));
-  assert.ok(manifest.background?.scripts?.length >= 4);
+  assert.equal(manifest.browser_action?.default_popup, 'src/popup.html');
+  assert.equal(manifest.options_ui?.page, 'src/popup.html');
+  assert.ok(manifest.background?.scripts?.includes('src/settings.js'));
   assert.equal(manifest.content_scripts.length, 2);
   assert.equal(manifest.content_scripts[0].world, 'MAIN');
   assert.equal(manifest.content_scripts[0].run_at, 'document_start');
+  assert.ok(manifest.content_scripts[1].js.includes('src/settings.js'));
 });
 
 test('mp3-tagger prepends valid ID3v2.3 UTF-16LE tags and skips if already tagged', () => {
@@ -353,11 +359,55 @@ test('hls-downloader end-to-end AAC ADTS inside TS -> M4A container', async () =
   assert.equal(result.mimeType, 'audio/mp4');
   assert.equal(String.fromCharCode(...result.data.subarray(4, 8)), 'ftyp');
   assert.equal(String.fromCharCode(...result.data.subarray(8, 12)), 'M4A ');
+
+  const rawAacResult = await downloadHlsAudio('https://cdn.vk.test/aac.m3u8', {
+    artist: 'Artist',
+    title: 'AAC Track',
+    format: 'aac',
+    fetchImpl: fetchMock,
+  });
+  assert.equal(rawAacResult.ext, 'aac');
+  assert.equal(rawAacResult.mimeType, 'audio/aac');
+  assert.equal(rawAacResult.data[0], 0xff);
 });
 
-test('sanitizeFilename and buildFilename produce safe Windows/Linux filenames', () => {
+test('pickVariantFromMaster respects quality setting (best, medium, low)', () => {
+  const master = [
+    '#EXTM3U',
+    '#EXT-X-STREAM-INF:BANDWIDTH=64000',
+    'low.m3u8',
+    '#EXT-X-STREAM-INF:BANDWIDTH=192000',
+    'mid.m3u8',
+    '#EXT-X-STREAM-INF:BANDWIDTH=320000',
+    'high.m3u8',
+  ].join('\n');
+
+  assert.equal(pickVariantFromMaster(master, 'https://cdn.vk.test/m.m3u8', 'best').bandwidth, 320000);
+  assert.equal(pickVariantFromMaster(master, 'https://cdn.vk.test/m.m3u8', 'medium').bandwidth, 192000);
+  assert.equal(pickVariantFromMaster(master, 'https://cdn.vk.test/m.m3u8', 'low').bandwidth, 64000);
+});
+
+test('settings normalizeSettings validates defaults and rejects invalid values', () => {
+  const normalized = normalizeSettings({
+    quality: 'ultra',
+    format: 'flac',
+    filenamePattern: 'invalid',
+    hideBroadcast: true,
+    embedMetadata: false,
+  });
+  assert.equal(normalized.quality, DEFAULT_SETTINGS.quality);
+  assert.equal(normalized.format, DEFAULT_SETTINGS.format);
+  assert.equal(normalized.filenamePattern, DEFAULT_SETTINGS.filenamePattern);
+  assert.equal(normalized.hideBroadcast, true);
+  assert.equal(normalized.hideSnippet, false);
+  assert.equal(normalized.embedMetadata, false);
+});
+
+test('sanitizeFilename and buildFilename produce safe Windows/Linux filenames and patterns', () => {
   assert.equal(sanitizeFilename('  Track: "Test" <1>?*. '), 'Track Test 1');
   assert.equal(sanitizeFilename('Track\u200B\u200E\u202E Name\uFEFF'), 'Track Name');
   assert.equal(buildFilename('Daft Punk', 'Get Lucky / Remix', 'mp3'), 'Daft Punk - Get Lucky Remix.mp3');
+  assert.equal(buildFilename('Daft Punk', 'Get Lucky', 'mp3', 'title_artist'), 'Get Lucky - Daft Punk.mp3');
+  assert.equal(buildFilename('Daft Punk', 'Get Lucky', 'mp3', 'title'), 'Get Lucky.mp3');
   assert.equal(buildFilename('', 'Untitled', 'm4a'), 'Untitled.m4a');
 });

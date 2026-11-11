@@ -12,11 +12,19 @@
     return cleaned.slice(0, 160).replace(/[.\s]+$/g, '') || fallback;
   }
 
-  function buildFilename(artist, title, extension) {
+  function buildFilename(artist, title, extension, pattern = 'artist_title') {
     const safeArtist = sanitizeFilename(artist, '');
     const safeTitle = sanitizeFilename(title, '');
     let base = 'VK Audio';
-    if (safeArtist && safeTitle) {
+    if (pattern === 'title') {
+      base = safeTitle || safeArtist || 'VK Audio';
+    } else if (pattern === 'title_artist') {
+      if (safeTitle && safeArtist) {
+        base = sanitizeFilename(`${safeTitle} - ${safeArtist}`, 'VK Audio');
+      } else {
+        base = safeTitle || safeArtist || 'VK Audio';
+      }
+    } else if (safeArtist && safeTitle) {
       base = sanitizeFilename(`${safeArtist} - ${safeTitle}`, 'VK Audio');
     } else if (safeTitle) {
       base = safeTitle;
@@ -160,7 +168,25 @@
     }
   }
 
+  async function downloadAndSaveHls({ targetUrl, tabId, downloadId, artist, title, settings }) {
+    const result = await root.VKMS.hlsDownloader.downloadHlsAudio(targetUrl, {
+      title,
+      artist,
+      quality: settings.quality,
+      format: settings.format,
+      embedMetadata: settings.embedMetadata,
+      onProgress: (pct) => sendProgress(tabId, downloadId, pct),
+    });
+    const filename = buildFilename(artist, title, result.ext, settings.filenamePattern);
+    const blob = new Blob([result.data], { type: result.mimeType });
+    await saveBlobToDownloads(blob, filename);
+    sendProgress(tabId, downloadId, 100);
+    return { ok: true, filename, format: result.ext };
+  }
+
   async function processAndDownload({ tabId, downloadId, url, artist, title }) {
+    const settings = await root.VKMS.settings.loadSettings();
+
     let targetUrl = url;
     if (!targetUrl && typeof tabId === 'number') {
       const recent = tabStreams.get(tabId);
@@ -176,16 +202,7 @@
     sendProgress(tabId, downloadId, 5);
 
     if (/\.m3u8(\?|$)/i.test(targetUrl)) {
-      const result = await root.VKMS.hlsDownloader.downloadHlsAudio(targetUrl, {
-        title,
-        artist,
-        onProgress: (pct) => sendProgress(tabId, downloadId, pct),
-      });
-      const filename = buildFilename(artist, title, result.ext);
-      const blob = new Blob([result.data], { type: result.mimeType });
-      await saveBlobToDownloads(blob, filename);
-      sendProgress(tabId, downloadId, 100);
-      return { ok: true, filename, format: result.ext };
+      return downloadAndSaveHls({ targetUrl, tabId, downloadId, artist, title, settings });
     }
 
     // Direct URL (or unknown content-type that might still be an m3u8)
@@ -201,26 +218,17 @@
     const bytes = new Uint8Array(await response.arrayBuffer());
 
     if (looksLikeM3u8(targetUrl, contentType, bytes)) {
-      const result = await root.VKMS.hlsDownloader.downloadHlsAudio(targetUrl, {
-        title,
-        artist,
-        onProgress: (pct) => sendProgress(tabId, downloadId, pct),
-      });
-      const filename = buildFilename(artist, title, result.ext);
-      const blob = new Blob([result.data], { type: result.mimeType });
-      await saveBlobToDownloads(blob, filename);
-      sendProgress(tabId, downloadId, 100);
-      return { ok: true, filename, format: result.ext };
+      return downloadAndSaveHls({ targetUrl, tabId, downloadId, artist, title, settings });
     }
 
     sendProgress(tabId, downloadId, 90);
     const fmt = detectFormatFromBytes(bytes, targetUrl);
     const finalBytes =
-      fmt.ext === 'mp3'
+      fmt.ext === 'mp3' && settings.embedMetadata
         ? root.VKMS.mp3Tagger.prependId3v2Tag(bytes, { title, artist })
         : bytes;
 
-    const filename = buildFilename(artist, title, fmt.ext);
+    const filename = buildFilename(artist, title, fmt.ext, settings.filenamePattern);
     const blob = new Blob([finalBytes], { type: fmt.mimeType });
     await saveBlobToDownloads(blob, filename);
     sendProgress(tabId, downloadId, 100);
