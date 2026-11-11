@@ -22,34 +22,112 @@
   const pendingResolves = new Map();
   const activeButtonsByDownloadId = new Map();
 
-  const DOWNLOAD_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-dl" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-      <path d="M12 4v10m0 0l-4-4m4 4l4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M5 17v1.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
 
-  const CHECK_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-ok" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-      <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
+  function createSvgEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      el.setAttribute(k, v);
+    }
+    return el;
+  }
 
-  const ERROR_ICON_SVG = `
-    <svg class="vkms-icon vkms-icon-err" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-      <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  `;
+  function createDownloadIconNode() {
+    const svg = createSvgEl('svg', {
+      class: 'vkms-icon vkms-icon-dl',
+      viewBox: '0 0 24 24',
+      width: '22',
+      height: '22',
+      fill: 'none',
+      'aria-hidden': 'true',
+    });
+    svg.appendChild(
+      createSvgEl('path', {
+        d: 'M12 4v10m0 0l-4-4m4 4l4-4',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })
+    );
+    svg.appendChild(
+      createSvgEl('path', {
+        d: 'M5 17v1.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V17',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })
+    );
+    return svg;
+  }
 
-  function createSpinnerHtml(percent) {
-    const pctText = typeof percent === 'number' && percent > 0 ? `${percent}%` : '';
-    return `
-      <span class="vkms-spinner-wrap" aria-hidden="true">
-        <span class="vkms-spinner"></span>
-        ${pctText ? `<span class="vkms-pct">${pctText}</span>` : ''}
-      </span>
-    `;
+  function createCheckIconNode() {
+    const svg = createSvgEl('svg', {
+      class: 'vkms-icon vkms-icon-ok',
+      viewBox: '0 0 24 24',
+      width: '22',
+      height: '22',
+      fill: 'none',
+      'aria-hidden': 'true',
+    });
+    svg.appendChild(
+      createSvgEl('path', {
+        d: 'M5 13l4 4L19 7',
+        stroke: 'currentColor',
+        'stroke-width': '2.2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })
+    );
+    return svg;
+  }
+
+  function createErrorIconNode() {
+    const svg = createSvgEl('svg', {
+      class: 'vkms-icon vkms-icon-err',
+      viewBox: '0 0 24 24',
+      width: '22',
+      height: '22',
+      fill: 'none',
+      'aria-hidden': 'true',
+    });
+    svg.appendChild(
+      createSvgEl('circle', {
+        cx: '12',
+        cy: '12',
+        r: '9',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+      })
+    );
+    svg.appendChild(
+      createSvgEl('path', {
+        d: 'M12 8v4m0 4h.01',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+      })
+    );
+    return svg;
+  }
+
+  function createSpinnerNode(percent) {
+    const wrap = document.createElement('span');
+    wrap.className = 'vkms-spinner-wrap';
+    wrap.setAttribute('aria-hidden', 'true');
+
+    const spin = document.createElement('span');
+    spin.className = 'vkms-spinner';
+    wrap.appendChild(spin);
+
+    const pct = document.createElement('span');
+    pct.className = 'vkms-pct';
+    if (typeof percent === 'number' && percent > 0) {
+      pct.textContent = `${percent}%`;
+    }
+    wrap.appendChild(pct);
+    return wrap;
   }
 
   function setButtonState(btn, state, infoText) {
@@ -58,21 +136,21 @@
 
     if (state === 'loading') {
       btn.classList.add('vkms-state-loading');
-      btn.innerHTML = createSpinnerHtml(0);
+      btn.replaceChildren(createSpinnerNode(0));
       btn.title = infoText || 'Скачивание трека...';
       btn.setAttribute('aria-label', btn.title);
     } else if (state === 'done') {
       btn.classList.add('vkms-state-done');
-      btn.innerHTML = CHECK_ICON_SVG;
+      btn.replaceChildren(createCheckIconNode());
       btn.title = infoText || 'Трек скачан';
       btn.setAttribute('aria-label', btn.title);
     } else if (state === 'error') {
       btn.classList.add('vkms-state-error');
-      btn.innerHTML = ERROR_ICON_SVG;
+      btn.replaceChildren(createErrorIconNode());
       btn.title = infoText || 'Ошибка скачивания';
       btn.setAttribute('aria-label', btn.title);
     } else {
-      btn.innerHTML = DOWNLOAD_ICON_SVG;
+      btn.replaceChildren(createDownloadIconNode());
       btn.title = 'Скачать трек (лучшее качество)';
       btn.setAttribute('aria-label', btn.title);
     }
@@ -419,7 +497,7 @@
     if (pctEl) {
       pctEl.textContent = msg.percent > 0 ? `${msg.percent}%` : '';
     } else {
-      btn.innerHTML = createSpinnerHtml(msg.percent);
+      btn.replaceChildren(createSpinnerNode(msg.percent));
     }
   });
 
